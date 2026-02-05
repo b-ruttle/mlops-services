@@ -1,0 +1,9 @@
+include:
+  - ./postgres/docker-compose.yml
+  - ./rustfs/docker-compose.yml
+  - ./mlflow/docker-compose.yml
+
+networks:
+  mlops:
+    name: ${MLOPS_NETWORK}
+    driver: bridge

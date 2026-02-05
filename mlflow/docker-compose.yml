@@ -1,0 +1,29 @@
+services:
+  mlflow:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE}
+    container_name: mlflow-server
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rustfs_init:
+        condition: service_completed_successfully
+    ports:
+      - "${MLFLOW_PORT_BIND}:${MLFLOW_PORT}:${MLFLOW_PORT}"
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: "http://rustfs:${RUSTFS_PORT}"
+      AWS_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+    command: >
+      mlflow server
+      --host ${MLFLOW_BIND_HOST}
+      --port ${MLFLOW_PORT}
+      --backend-store-uri postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${POSTGRES_DB}
+      --artifacts-destination s3://${MLFLOW_ARTIFACT_BUCKET}
+      --serve-artifacts
+    restart: unless-stopped
+    networks: [mlops]

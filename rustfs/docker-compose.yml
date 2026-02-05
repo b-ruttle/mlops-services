@@ -1,0 +1,51 @@
+services:
+  rustfs:
+    image: ${RUSTFS_IMAGE}
+    container_name: mlflow-rustfs
+    ports:
+      - "${RUSTFS_PORT}:${RUSTFS_PORT}"
+      - "${RUSTFS_CONSOLE_PORT}:${RUSTFS_CONSOLE_PORT}"
+    volumes:
+      - ${RUSTFS_DATA_DIR}:/data
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY}
+      RUSTFS_ADDRESS: "0.0.0.0:${RUSTFS_PORT}"
+      RUSTFS_CONSOLE_ADDRESS: "0.0.0.0:${RUSTFS_CONSOLE_PORT}"
+      RUSTFS_CONSOLE_ENABLE: "true"
+    restart: unless-stopped
+    networks: [mlops]
+
+  volume-permission-helper:
+    image: ${ALPINE_IMAGE}
+    container_name: rustfs-volume-permissions
+    volumes:
+      - ${RUSTFS_DATA_DIR}:/data
+    command: >
+      sh -c "
+        chown -R 10001:10001 /data &&
+        echo 'RustFS volume permissions fixed (10001:10001)' &&
+        exit 0
+      "
+    restart: "no"
+    networks: [mlops]
+
+  rustfs_init:
+    image: ${MC_IMAGE}
+    container_name: rustfs-init-buckets
+    depends_on:
+      - rustfs
+      - volume-permission-helper
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for RustFS S3 endpoint...';
+      until mc alias set rustfs http://rustfs:${RUSTFS_PORT} ${RUSTFS_ACCESS_KEY} ${RUSTFS_SECRET_KEY}; do
+        sleep 2;
+      done;
+      mc mb -p rustfs/${MLFLOW_ARTIFACT_BUCKET} || true;
+      echo 'Bucket ensured: ${MLFLOW_ARTIFACT_BUCKET}';
+      mc mb -p rustfs/${DVC_BUCKET} || true;
+      echo 'Bucket ensured: ${DVC_BUCKET}';
+      "
+    restart: "no"
+    networks: [mlops]
