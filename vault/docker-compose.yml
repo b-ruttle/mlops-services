@@ -1,0 +1,20 @@
+services:
+  vault:
+    image: ${VAULT_IMAGE}
+    container_name: mlops-vault
+    cap_add:
+      - IPC_LOCK
+    command: >
+      vault server
+      -dev
+      -dev-root-token-id=${VAULT_DEV_ROOT_TOKEN}
+      -dev-listen-address=0.0.0.0:${VAULT_PORT}
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_DEV_ROOT_TOKEN}
+      VAULT_ADDR: "http://127.0.0.1:${VAULT_PORT}"
+    ports:
+      - "${VAULT_PORT_BIND}:${VAULT_PORT}:${VAULT_PORT}"
+    expose:
+      - "${VAULT_PORT}"
+    restart: unless-stopped
+    networks: [mlops]

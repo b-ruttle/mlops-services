@@ -1,0 +1,55 @@
+{
+  "realm": "mlops",
+  "enabled": true,
+  "displayName": "MLOps",
+  "registrationAllowed": false,
+  "rememberMe": true,
+  "resetPasswordAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "groups": [
+    {
+      "name": "mlops-admin"
+    },
+    {
+      "name": "mlops-editor"
+    },
+    {
+      "name": "mlops-viewer"
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "__OAUTH2_PROXY_CLIENT_ID__",
+      "name": "MLflow Gateway",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "__KEYCLOAK_GATEWAY_CLIENT_SECRET__",
+      "redirectUris": [
+        "https://__PUBLIC_FQDN__/oauth2/callback"
+      ],
+      "webOrigins": [
+        "https://__PUBLIC_FQDN__"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "groups"
+          }
+        }
+      ]
+    }
+  ]
+}

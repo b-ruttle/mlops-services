@@ -1,0 +1,47 @@
+services:
+  keycloak-postgres:
+    image: ${POSTGRES_IMAGE}
+    container_name: keycloak-postgres
+    environment:
+      POSTGRES_DB: ${KEYCLOAK_DB_NAME}
+      POSTGRES_USER: ${KEYCLOAK_DB_USER}
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+    volumes:
+      - ${KEYCLOAK_POSTGRES_DATA_DIR}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${KEYCLOAK_DB_USER} -d ${KEYCLOAK_DB_NAME}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    networks: [mlops]
+
+  keycloak:
+    image: ${KEYCLOAK_IMAGE}
+    container_name: mlops-keycloak
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+    entrypoint:
+      - /bin/bash
+      - /opt/keycloak/bootstrap/entrypoint.sh
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_DB: postgres
+      KC_DB_URL_HOST: keycloak-postgres
+      KC_DB_URL_PORT: ${POSTGRES_PORT}
+      KC_DB_URL_DATABASE: ${KEYCLOAK_DB_NAME}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      KC_HEALTH_ENABLED: "true"
+      PUBLIC_FQDN: ${PUBLIC_FQDN}
+      OAUTH2_PROXY_CLIENT_ID: ${OAUTH2_PROXY_CLIENT_ID}
+      KEYCLOAK_GATEWAY_CLIENT_SECRET: ${KEYCLOAK_GATEWAY_CLIENT_SECRET}
+      KEYCLOAK_PORT: ${KEYCLOAK_PORT}
+    expose:
+      - "${KEYCLOAK_PORT}"
+    volumes:
+      - ./keycloak/bootstrap:/opt/keycloak/bootstrap:ro
+    restart: unless-stopped
+    networks: [mlops]
