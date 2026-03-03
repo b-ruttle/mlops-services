@@ -1,4 +1,4 @@
-.PHONY: help up down ps logs test
+.PHONY: help up down ps logs test vault-seed vault-render
 
 help:
 	@echo "Make targets:"
@@ -8,6 +8,8 @@ help:
 	@echo "  make logs          Tail logs (all services)"
 	@echo "  make logs SERVICE=mlflow   Tail logs for one service"
 	@echo "  make test          Run smoke test"
+	@echo "  make vault-seed    Seed local Vault KV and deploy policy"
+	@echo "  make vault-render  Render .runtime/secrets.env from Vault KV"
 
 up:
 	./scripts/compose.sh up -d --build
@@ -24,3 +26,9 @@ logs:
 
 test:
 	./scripts/smoke-test.sh
+
+vault-seed:
+	./scripts/vault/seed-dev.sh
+
+vault-render:
+	./scripts/vault/render-secrets.sh
