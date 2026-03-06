@@ -11,8 +11,8 @@ services:
         condition: service_healthy
       rustfs_init:
         condition: service_completed_successfully
-    ports:
-      - "${MLFLOW_PORT_BIND}:${MLFLOW_PORT}:${MLFLOW_PORT}"
+    expose:
+      - "${MLFLOW_PORT}"
     environment:
       MLFLOW_S3_ENDPOINT_URL: "http://rustfs:${RUSTFS_PORT}"
       AWS_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY}
