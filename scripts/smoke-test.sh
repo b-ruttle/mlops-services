@@ -17,6 +17,7 @@ cd "${ROOT_DIR}"
 if ! "${COMPOSE}" up -d --build; then
   echo "ERROR: docker compose up failed"
   "${COMPOSE}" ps || true
+  "${COMPOSE}" logs --no-color --tail=200 nginx || true
   "${COMPOSE}" logs --no-color --tail=200 postgres || true
   "${COMPOSE}" logs --no-color --tail=200 rustfs || true
   "${COMPOSE}" logs --no-color --tail=200 mlflow || true
@@ -26,27 +27,46 @@ fi
 MLFLOW_PORT="${MLFLOW_PORT:-5000}"
 RUSTFS_PORT="${RUSTFS_PORT:-9000}"
 MLFLOW_S3_ENDPOINT_URL="${MLFLOW_S3_ENDPOINT_URL:-http://rustfs:${RUSTFS_PORT}}"
-MLFLOW_PORT_BIND="${MLFLOW_PORT_BIND:-127.0.0.1}"
-MLFLOW_HEALTH_HOST="${MLFLOW_PORT_BIND}"
-if [[ "${MLFLOW_HEALTH_HOST}" == "0.0.0.0" ]]; then
-  MLFLOW_HEALTH_HOST="127.0.0.1"
+NGINX_PORT="${NGINX_PORT:-80}"
+PUBLIC_FQDN="${PUBLIC_FQDN:-localhost}"
+MLFLOW_BASE_PATH="${MLFLOW_BASE_PATH:-mlflow}"
+if [[ "${MLFLOW_BASE_PATH}" != /* ]]; then
+  MLFLOW_BASE_PATH="/${MLFLOW_BASE_PATH}"
+fi
+MLFLOW_BASE_PATH="${MLFLOW_BASE_PATH%/}"
+if [[ -z "${MLFLOW_BASE_PATH}" ]]; then
+  echo "ERROR: MLFLOW_BASE_PATH must not be empty or '/'."
+  exit 1
 fi
 
-echo "Waiting for MLflow to respond on ${MLFLOW_HEALTH_HOST}:${MLFLOW_PORT}..."
+PUBLIC_MLFLOW_URI="http://${PUBLIC_FQDN}"
+LOCAL_PROXY_URI="http://127.0.0.1"
+if [[ "${NGINX_PORT}" != "80" ]]; then
+  PUBLIC_MLFLOW_URI="${PUBLIC_MLFLOW_URI}:${NGINX_PORT}"
+  LOCAL_PROXY_URI="${LOCAL_PROXY_URI}:${NGINX_PORT}"
+fi
+PUBLIC_MLFLOW_URI="${PUBLIC_MLFLOW_URI}${MLFLOW_BASE_PATH}"
+LOCAL_MLFLOW_URI="${LOCAL_PROXY_URI}${MLFLOW_BASE_PATH}"
+INTERNAL_MLFLOW_URI="http://mlflow:${MLFLOW_PORT}"
+
+echo "Waiting for MLflow to respond via proxy path ${MLFLOW_BASE_PATH} ..."
 for _ in {1..60}; do
-  if curl -fsS "http://${MLFLOW_HEALTH_HOST}:${MLFLOW_PORT}/" >/dev/null; then
+  if curl -fsSL "${LOCAL_MLFLOW_URI}/" >/dev/null 2>&1; then
     echo "MLflow is up."
     break
   fi
   sleep 2
 done
 
-if ! curl -fsS "http://${MLFLOW_HEALTH_HOST}:${MLFLOW_PORT}/" >/dev/null; then
+if ! curl -fsSL "${LOCAL_MLFLOW_URI}/" >/dev/null 2>&1; then
   echo "MLflow did not become ready in time."
+  "${COMPOSE}" ps || true
+  "${COMPOSE}" logs --no-color --tail=200 nginx || true
+  "${COMPOSE}" logs --no-color --tail=200 mlflow || true
   exit 1
 fi
 
-MLFLOW_URI="${1:-http://${MLFLOW_HEALTH_HOST}:${MLFLOW_PORT}}"
+MLFLOW_URI="${1:-${INTERNAL_MLFLOW_URI}}"
 
 "${COMPOSE}" exec -T mlflow python - <<PY
 import mlflow
@@ -73,6 +93,7 @@ with mlflow.start_run() as run:
     mlflow.log_artifact("hello.txt")
 
 print("OK: logged run + artifact to", "${MLFLOW_URI}")
+print("OK: public proxy endpoint reachable at", "${PUBLIC_MLFLOW_URI}")
 
 # Cleanup: remove local file and delete the test run + artifacts.
 try:

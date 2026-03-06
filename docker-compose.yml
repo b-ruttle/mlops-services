@@ -2,6 +2,7 @@ include:
   - ./postgres/docker-compose.yml
   - ./rustfs/docker-compose.yml
   - ./mlflow/docker-compose.yml
+  - ./nginx/docker-compose.yml
 
 networks:
   mlops:

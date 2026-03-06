@@ -1,0 +1,21 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: mlops-nginx
+    depends_on:
+      - mlflow
+      - rustfs
+    ports:
+      - "${NGINX_PORT_BIND}:${NGINX_PORT}:80"
+    environment:
+      PUBLIC_FQDN: ${PUBLIC_FQDN}
+      MLFLOW_BASE_PATH: ${MLFLOW_BASE_PATH}
+      RUSTFS_BASE_PATH: ${RUSTFS_BASE_PATH}
+      RUSTFS_API_BASE_PATH: ${RUSTFS_API_BASE_PATH}
+      MLFLOW_PORT: ${MLFLOW_PORT}
+      RUSTFS_PORT: ${RUSTFS_PORT}
+      RUSTFS_CONSOLE_PORT: ${RUSTFS_CONSOLE_PORT}
+    volumes:
+      - ./default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    restart: unless-stopped
+    networks: [mlops]
