@@ -1,85 +1,118 @@
 # MLOps Services
 
-Local MLOps services for development and testing, orchestrated with Docker Compose. The stack includes MLflow, Postgres for the backend store, and RustFS as an S3-compatible artifact store, plus helper containers for bootstrapping and volume permissions.
+Local MLOps services for development and testing, orchestrated with Docker Compose.
+
+The stack includes:
+- MLflow (tracking server)
+- Postgres (MLflow backend store)
+- RustFS (S3-compatible object store)
+- Nginx (single HTTP entrypoint with path-based routing)
 
 ## Quickstart
 
+1. Configure secrets:
+```bash
+cp env/secrets.env.example env/secrets.env
+# then edit env/secrets.env
+```
+
+2. Start the stack:
 ```bash
 make up
 ```
 
+3. Open services (no hosts-file edits required by default):
+- `http://localhost/mlflow`
+- `http://localhost/rustfs` (RustFS console)
+- `http://localhost/` (simple index page)
+
+Stop services:
 ```bash
 make down
 ```
 
+## Routing Model
+
+Routing is path-based through one public endpoint.
+
+Default public endpoint values from `env/config.env`:
+- `PUBLIC_FQDN=localhost`
+- `NGINX_PORT=80`
+- `NGINX_PORT_BIND=127.0.0.1`
+
+Default service paths:
+- `MLFLOW_BASE_PATH=mlflow`
+- `RUSTFS_BASE_PATH=rustfs`
+- `RUSTFS_API_BASE_PATH=rustfs-api`
+
+Path variables are normalized by `scripts/compose.sh`:
+- a leading `/` is added if missing
+- trailing `/` is removed
+
 ## Env Files
 
 Environment settings live under `env/` and are loaded by `scripts/compose.sh` in this order:
+1. `env/versions.env`
+2. `env/config.env`
+3. `env/secrets.env`
 
-1. `env/versions.env` (image and tooling versions)
-2. `env/config.env` (ports, data dirs, buckets)
-3. `env/secrets.env` (credentials and secrets)
+If you need a template for secrets, use `env/secrets.env.example`.
 
-If you need a template for secrets, see `env/secrets.env.example`.
+## Networking and Ports
 
-## Ports and Data
+- All services run on the shared Docker network `mlops`.
+- Nginx routes to service names inside Docker (for example `mlflow:5000`, `rustfs:9001`).
+- Nginx is the only web entrypoint exposed on the host:
+  - `${NGINX_PORT_BIND}:${NGINX_PORT}:80`
+- RustFS and MLflow are not exposed directly on host ports.
+- Postgres remains internal to Docker.
 
-Defaults are defined in `env/config.env` and can be overridden there.
+Current HTTP routing:
+- `${MLFLOW_BASE_PATH}` -> `mlflow:${MLFLOW_PORT}`
+- `${RUSTFS_BASE_PATH}` -> `rustfs:${RUSTFS_CONSOLE_PORT}`
+- `${RUSTFS_API_BASE_PATH}` -> `rustfs:${RUSTFS_PORT}`
+- `/` -> small HTML index page
 
-Ports:
-`MLFLOW_PORT` default `5000`, bound on `MLFLOW_PORT_BIND` (default `127.0.0.1`)  
-`RUSTFS_PORT` default `9000`  
-`RUSTFS_CONSOLE_PORT` default `9001`
+RustFS API note:
+- `${RUSTFS_API_BASE_PATH}` is for S3-compatible API clients and integrations (authenticated requests).
+- A direct browser request to `http://localhost${RUSTFS_API_BASE_PATH}/` commonly returns `403 AccessDenied` and is expected.
 
-Data persistence:
-`POSTGRES_DATA_DIR` default `../../../volumes/mlops-data/postgres`  
-`RUSTFS_DATA_DIR` default `../../../volumes/mlops-data/rustfs`
+HTTP only for now (no TLS yet). The Nginx config is structured so HTTPS can be added later at the proxy.
 
 ## Makefile
 
-`make up`  
-Start services (build if needed).
+- `make up` start services (build if needed)
+- `make down` stop services
+- `make ps` show service status
+- `make logs` tail logs for all services
+- `make logs SERVICE=nginx` tail logs for one service
+- `make test` run smoke test
 
-`make down`  
-Stop services.
+## Adding Another Service Behind Nginx
 
-`make ps`  
-Show service status.
+1. Add the service to Compose on the `mlops` network.
+2. Keep it internal (prefer `expose`, avoid host `ports` unless explicitly needed).
+3. Add a path variable in `env/config.env`.
+4. Add Nginx locations in `nginx/default.conf.template`:
+   - `location = /your-path { return 301 /your-path/; }`
+   - `location /your-path/ { proxy_pass http://<docker-service-name>:<port>/; }`
+   - include standard forwarding headers.
 
-`make logs`  
-Tail logs for all services.
+## Remote/VPN Migration Later
 
-`make logs SERVICE=mlflow`  
-Tail logs for a single service.
+When moving to a shared server, update:
+- `PUBLIC_FQDN` to a DNS name reachable by your VPN users
+- `NGINX_PORT_BIND` to `0.0.0.0` or a specific server IP
 
-`make test`  
-Run the smoke test.
-
-## Services
-
-`postgres`  
-Postgres database used as the MLflow backend store. Data persists under `POSTGRES_DATA_DIR`.
-
-`rustfs`  
-S3-compatible object store for MLflow artifacts (and any other buckets you configure). Data persists under `RUSTFS_DATA_DIR`. Exposes an S3 API port and a console UI port.
-
-`rustfs_init`  
-One-shot init container that waits for RustFS, then ensures required buckets exist (`MLFLOW_ARTIFACT_BUCKET` and `DVC_BUCKET`).
-
-`volume-permission-helper`  
-One-shot container that fixes RustFS volume permissions on the host-mounted data directory.
-
-`mlflow`  
-MLflow tracking server configured to use Postgres for the backend store and RustFS for artifact storage. Exposed on `MLFLOW_PORT_BIND:MLFLOW_PORT`.
+Team members then access the same server endpoint and paths, for example:
+- `http://<your-server-dns>/mlflow`
 
 ## Troubleshooting
 
-If the stack fails to start, check:
-`make ps` to see container status  
-`make logs` or `make logs SERVICE=mlflow` for details
-
-Common issues:
-Port conflicts on `5000`, `9000`, or `9001`  
-Missing or incorrect values in `env/secrets.env`  
-RustFS volume permissions (fixed by `volume-permission-helper`)  
-Postgres health check not passing yet (wait a few seconds and retry)
+- Service not reachable:
+  - verify `make ps`
+  - check `make logs` and `make logs SERVICE=nginx`
+- Port conflicts on host:
+  - check if another process already uses `${NGINX_PORT}`
+- Remote users cannot connect:
+  - verify server bind (`NGINX_PORT_BIND`) and DNS/VPN reachability
