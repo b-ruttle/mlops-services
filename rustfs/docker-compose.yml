@@ -2,9 +2,9 @@ services:
   rustfs:
     image: ${RUSTFS_IMAGE}
     container_name: mlflow-rustfs
-    ports:
-      - "${RUSTFS_PORT}:${RUSTFS_PORT}"
-      - "${RUSTFS_CONSOLE_PORT}:${RUSTFS_CONSOLE_PORT}"
+    expose:
+      - "${RUSTFS_PORT}"
+      - "${RUSTFS_CONSOLE_PORT}"
     volumes:
       - ${RUSTFS_DATA_DIR}:/data
     environment:
