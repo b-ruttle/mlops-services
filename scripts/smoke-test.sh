@@ -51,14 +51,16 @@ INTERNAL_MLFLOW_URI="http://mlflow:${MLFLOW_PORT}"
 
 echo "Waiting for MLflow to respond via proxy path ${MLFLOW_BASE_PATH} ..."
 for _ in {1..60}; do
-  if curl -fsSL "${LOCAL_MLFLOW_URI}/" >/dev/null 2>&1; then
-    echo "MLflow is up."
+  status_code="$(curl -sS -o /dev/null -w "%{http_code}" "${LOCAL_MLFLOW_URI}/" || true)"
+  if [[ "${status_code}" == "200" || "${status_code}" == "401" ]]; then
+    echo "MLflow is up (HTTP ${status_code})."
     break
   fi
   sleep 2
 done
 
-if ! curl -fsSL "${LOCAL_MLFLOW_URI}/" >/dev/null 2>&1; then
+status_code="$(curl -sS -o /dev/null -w "%{http_code}" "${LOCAL_MLFLOW_URI}/" || true)"
+if [[ "${status_code}" != "200" && "${status_code}" != "401" ]]; then
   echo "MLflow did not become ready in time."
   "${COMPOSE}" ps || true
   "${COMPOSE}" logs --no-color --tail=200 nginx || true
@@ -69,6 +71,17 @@ fi
 MLFLOW_URI="${1:-${INTERNAL_MLFLOW_URI}}"
 
 "${COMPOSE}" exec -T mlflow python - <<PY
+import os
+
+os.environ.setdefault(
+    "MLFLOW_TRACKING_USERNAME",
+    os.environ.get("MLFLOW_AUTH_ADMIN_USERNAME", "admin"),
+)
+os.environ.setdefault(
+    "MLFLOW_TRACKING_PASSWORD",
+    os.environ.get("MLFLOW_AUTH_ADMIN_PASSWORD", ""),
+)
+
 import mlflow
 from mlflow.tracking import MlflowClient
 

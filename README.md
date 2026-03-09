@@ -15,6 +15,9 @@ The stack includes:
 cp env/secrets.env.example env/secrets.env
 # then edit env/secrets.env
 ```
+Set strong values for:
+- `MLFLOW_FLASK_SERVER_SECRET_KEY`
+- `MLFLOW_AUTH_ADMIN_PASSWORD`
 
 2. Start the stack:
 ```bash
@@ -30,6 +33,26 @@ Stop services:
 ```bash
 make down
 ```
+
+## MLflow Users and Permissions
+
+MLflow runs with built-in basic auth enabled so team members can use unique accounts and you can attribute runs to individual users.
+
+- Bootstrap admin credentials come from `env/secrets.env`:
+  - `MLFLOW_AUTH_ADMIN_USERNAME` (default `admin`)
+  - `MLFLOW_AUTH_ADMIN_PASSWORD`
+- `MLFLOW_FLASK_SERVER_SECRET_KEY` is required for MLflow session security.
+- `MLFLOW_AUTH_DEFAULT_PERMISSION` (in `env/config.env`) sets the default permission for newly created users.
+
+Recommended team workflow:
+1. Keep one admin account for platform maintenance.
+2. Create one MLflow user per teammate.
+3. Assign experiment/model permissions per user (for example `READ`, `EDIT`, `MANAGE`) from the MLflow admin UI.
+4. Have each user log in with their own account in UI/SDK (do not share one login).
+
+Notes:
+- `env/secrets.env` is only for service/bootstrap credentials, not a full team user list.
+- MLflow account data and permissions are stored in Postgres.
 
 ## Routing Model
 

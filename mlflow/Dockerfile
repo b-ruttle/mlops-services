@@ -10,3 +10,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+COPY start-mlflow.sh /usr/local/bin/start-mlflow.sh
+RUN chmod +x /usr/local/bin/start-mlflow.sh
