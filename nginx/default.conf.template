@@ -8,6 +8,9 @@ server {
     listen 80;
     server_name ${PUBLIC_FQDN} localhost 127.0.0.1;
 
+    # Re-resolve Docker service names so proxying survives container restarts/recreates.
+    resolver 127.0.0.11 valid=10s ipv6=off;
+
     location = / {
         default_type text/html;
         return 200 '<!doctype html><html><head><meta charset="utf-8"><title>MLOps Services</title></head><body><h1>MLOps Services</h1><ul><li><a href="${MLFLOW_BASE_PATH}/">MLflow</a></li><li><a href="${RUSTFS_BASE_PATH}/">RustFS Console</a></li><li><a href="${RUSTFS_API_BASE_PATH}/">RustFS API</a></li></ul></body></html>';
@@ -25,7 +28,8 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Prefix ${MLFLOW_BASE_PATH};
         proxy_read_timeout 300;
-        proxy_pass http://mlflow:${MLFLOW_PORT}/;
+        set $mlflow_upstream mlflow:${MLFLOW_PORT};
+        proxy_pass http://$mlflow_upstream/;
     }
 
     location = ${RUSTFS_BASE_PATH} {
@@ -45,7 +49,8 @@ server {
         proxy_set_header X-Forwarded-Prefix ${RUSTFS_BASE_PATH};
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
-        proxy_pass http://rustfs:${RUSTFS_CONSOLE_PORT};
+        set $rustfs_console_upstream rustfs:${RUSTFS_CONSOLE_PORT};
+        proxy_pass http://$rustfs_console_upstream;
     }
 
     location = ${RUSTFS_API_BASE_PATH} {
@@ -59,7 +64,8 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Prefix ${RUSTFS_API_BASE_PATH};
-        proxy_pass http://rustfs:${RUSTFS_PORT}/;
+        set $rustfs_api_upstream rustfs:${RUSTFS_PORT};
+        proxy_pass http://$rustfs_api_upstream/;
     }
 }
 
