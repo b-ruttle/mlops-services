@@ -4,7 +4,7 @@ Local MLOps services for development and testing, orchestrated with Docker Compo
 
 The stack includes:
 - MLflow (tracking server)
-- Postgres (MLflow backend store)
+- Postgres (MLflow backend store & offline feature store)
 - RustFS (S3-compatible object store)
 - Nginx (single HTTP entrypoint with path-based routing)
 
