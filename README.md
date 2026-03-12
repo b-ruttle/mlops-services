@@ -4,6 +4,7 @@ Local MLOps services for development and testing, orchestrated with Docker Compo
 
 The stack includes:
 - MLflow (tracking server)
+- MLflow Admin App (simple user management UI for MLflow auth users)
 - Postgres (MLflow backend store)
 - RustFS (S3-compatible object store)
 - Nginx (single HTTP entrypoint with path-based routing)
@@ -18,6 +19,8 @@ cp env/secrets.env.example env/secrets.env
 Set strong values for:
 - `MLFLOW_FLASK_SERVER_SECRET_KEY`
 - `MLFLOW_AUTH_ADMIN_PASSWORD`
+- `MLFLOW_ADMIN_APP_PASSWORD`
+- `MLFLOW_ADMIN_APP_SECRET_KEY`
 
 2. Start the stack:
 ```bash
@@ -26,6 +29,7 @@ make up
 
 3. Open services (no hosts-file edits required by default):
 - `http://localhost/mlflow`
+- `http://localhost/mlflow-admin` (admin app login)
 - `http://localhost/rustfs` (RustFS console)
 - `http://localhost/` (simple index page)
 
@@ -43,6 +47,7 @@ MLflow runs with built-in basic auth enabled so team members can use unique acco
   - `MLFLOW_AUTH_ADMIN_PASSWORD`
 - `MLFLOW_FLASK_SERVER_SECRET_KEY` is required for MLflow session security.
 - `MLFLOW_AUTH_DEFAULT_PERMISSION` (in `env/config.env`) sets the default permission for newly created users.
+- `MLFLOW_AUTH_POSTGRES_DB` (in `env/config.env`) names the Postgres DB used by MLflow auth (default `mlflow_auth`).
 
 Recommended team workflow:
 1. Keep one admin account for platform maintenance.
@@ -52,7 +57,10 @@ Recommended team workflow:
 
 Notes:
 - `env/secrets.env` is only for service/bootstrap credentials, not a full team user list.
-- MLflow account data and permissions are stored in Postgres.
+- MLflow auth account data follows `MLFLOW_AUTH_DATABASE_URI` and is expected to use Postgres (`postgresql+psycopg2://...`) in this setup.
+- Keep auth in Postgres on the same server but a separate DB (for example `mlflow_auth`), because MLflow tracking and auth both use Alembic and should not share one DB.
+- The MLflow Admin App authenticates with its own login (`MLFLOW_ADMIN_APP_USERNAME`/`MLFLOW_ADMIN_APP_PASSWORD`) and then calls MLflow APIs using `MLFLOW_AUTH_ADMIN_USERNAME`/`MLFLOW_AUTH_ADMIN_PASSWORD`.
+- The MLflow Admin App user list is sourced from the auth database (no API fallback path).
 
 ## Routing Model
 
@@ -65,6 +73,7 @@ Default public endpoint values from `env/config.env`:
 
 Default service paths:
 - `MLFLOW_BASE_PATH=mlflow`
+- `MLFLOW_ADMIN_BASE_PATH=mlflow-admin`
 - `RUSTFS_BASE_PATH=rustfs`
 - `RUSTFS_API_BASE_PATH=rustfs-api`
 
@@ -92,6 +101,7 @@ If you need a template for secrets, use `env/secrets.env.example`.
 
 Current HTTP routing:
 - `${MLFLOW_BASE_PATH}` -> `mlflow:${MLFLOW_PORT}`
+- `${MLFLOW_ADMIN_BASE_PATH}` -> `mlflow-admin:${MLFLOW_ADMIN_PORT}`
 - `${RUSTFS_BASE_PATH}` -> `rustfs:${RUSTFS_CONSOLE_PORT}`
 - `${RUSTFS_API_BASE_PATH}` -> `rustfs:${RUSTFS_PORT}`
 - `/` -> small HTML index page
