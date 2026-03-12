@@ -22,7 +22,7 @@ server {
         }
 
         default_type text/html;
-        return 200 '<!doctype html><html><head><meta charset="utf-8"><title>MLOps Services</title></head><body><h1>MLOps Services</h1><ul><li><a href="${MLFLOW_BASE_PATH}/">MLflow</a></li><li><a href="${RUSTFS_BASE_PATH}/">RustFS Console</a></li><li><a href="${RUSTFS_API_BASE_PATH}/">RustFS API</a></li></ul></body></html>';
+        return 200 '<!doctype html><html><head><meta charset="utf-8"><title>MLOps Services</title></head><body><h1>MLOps Services</h1><ul><li><a href="${MLFLOW_BASE_PATH}/">MLflow</a></li><li><a href="${MLFLOW_ADMIN_BASE_PATH}/">MLflow Admin</a></li><li><a href="${RUSTFS_BASE_PATH}/">RustFS Console</a></li><li><a href="${RUSTFS_API_BASE_PATH}/">RustFS API</a></li></ul></body></html>';
     }
 
     location @rustfs_console_root_post {
@@ -51,6 +51,20 @@ server {
         proxy_set_header X-Forwarded-Prefix ${MLFLOW_BASE_PATH};
         proxy_read_timeout 300;
         proxy_pass http://mlflow:${MLFLOW_PORT}/;
+    }
+
+    location = ${MLFLOW_ADMIN_BASE_PATH} {
+        return 301 ${MLFLOW_ADMIN_BASE_PATH}/;
+    }
+
+    location ${MLFLOW_ADMIN_BASE_PATH}/ {
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Prefix ${MLFLOW_ADMIN_BASE_PATH};
+        proxy_pass http://mlflow-admin:${MLFLOW_ADMIN_PORT}/;
     }
 
     location = ${RUSTFS_BASE_PATH} {
