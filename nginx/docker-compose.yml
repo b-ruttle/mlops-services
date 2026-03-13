@@ -7,6 +7,7 @@ services:
       - rustfs
     ports:
       - "${NGINX_PORT_BIND}:${NGINX_PORT}:80"
+      - "9000:9000"
     environment:
       PUBLIC_FQDN: ${PUBLIC_FQDN}
       MLFLOW_BASE_PATH: ${MLFLOW_BASE_PATH}
@@ -18,4 +19,4 @@ services:
     volumes:
       - ./default.conf.template:/etc/nginx/templates/default.conf.template:ro
     restart: unless-stopped
-    networks: [mlops]
+    networks: [ mlops ]
