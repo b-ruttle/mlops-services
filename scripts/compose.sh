@@ -34,7 +34,6 @@ normalize_base_path_var() {
 
 normalize_base_path_var "MLFLOW_BASE_PATH" "mlflow"
 normalize_base_path_var "RUSTFS_BASE_PATH" "rustfs"
-normalize_base_path_var "RUSTFS_API_BASE_PATH" "rustfs-api"
 
 normalize_existing_base_path_vars() {
   local var_name
@@ -42,7 +41,6 @@ normalize_existing_base_path_vars() {
     [[ "${var_name}" == *_BASE_PATH ]] || continue
     [[ "${var_name}" == "MLFLOW_BASE_PATH" ]] && continue
     [[ "${var_name}" == "RUSTFS_BASE_PATH" ]] && continue
-    [[ "${var_name}" == "RUSTFS_API_BASE_PATH" ]] && continue
     # Normalize only variables that are already defined by env files.
     [[ -n "${!var_name+x}" ]] || continue
     normalize_base_path_var "${var_name}" "${!var_name}"

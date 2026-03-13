@@ -33,6 +33,11 @@ make up
 - `http://localhost/rustfs` (RustFS console)
 - `http://localhost/` (simple index page)
 
+Storage note:
+- The RustFS web console is exposed at `/rustfs`.
+- The S3-compatible API remains internal to the Docker network and is used by MLflow at `http://rustfs:${RUSTFS_PORT}`.
+- If you need host-side S3 access later, add an explicit port publish or a dedicated proxy route.
+
 Stop services:
 ```bash
 make down
@@ -78,7 +83,6 @@ Default service paths:
 - `MLFLOW_BASE_PATH=mlflow`
 - `MLFLOW_ADMIN_BASE_PATH=mlflow-admin`
 - `RUSTFS_BASE_PATH=rustfs`
-- `RUSTFS_API_BASE_PATH=rustfs-api`
 
 Path variables are normalized by `scripts/compose.sh`:
 - a leading `/` is added if missing
@@ -99,19 +103,15 @@ If you need a template for secrets, use `env/secrets.env.example`.
 - Nginx routes to service names inside Docker (for example `mlflow:5000`, `rustfs:9001`).
 - Nginx is the only web entrypoint exposed on the host:
   - `${NGINX_PORT_BIND}:${NGINX_PORT}:80`
-- RustFS and MLflow are not exposed directly on host ports.
+- RustFS console, MLflow, and mlflow-admin are not exposed directly on host ports.
+- RustFS's S3-compatible API is also not exposed on a public Nginx path.
 - Postgres remains internal to Docker.
 
 Current HTTP routing:
 - `${MLFLOW_BASE_PATH}` -> `mlflow:${MLFLOW_PORT}`
 - `${MLFLOW_ADMIN_BASE_PATH}` -> `mlflow-admin:${MLFLOW_ADMIN_PORT}`
 - `${RUSTFS_BASE_PATH}` -> `rustfs:${RUSTFS_CONSOLE_PORT}`
-- `${RUSTFS_API_BASE_PATH}` -> `rustfs:${RUSTFS_PORT}`
 - `/` -> small HTML index page
-
-RustFS API note:
-- `${RUSTFS_API_BASE_PATH}` is for S3-compatible API clients and integrations (authenticated requests).
-- A direct browser request to `http://localhost${RUSTFS_API_BASE_PATH}/` commonly returns `403 AccessDenied` and is expected.
 
 HTTP only for now (no TLS yet). The Nginx config is structured so HTTPS can be added later at the proxy.
 
