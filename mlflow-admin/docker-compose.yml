@@ -1,0 +1,25 @@
+services:
+  mlflow-admin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE}
+    container_name: mlflow-admin
+    depends_on:
+      - mlflow
+    expose:
+      - "${MLFLOW_ADMIN_PORT}"
+    environment:
+      MLFLOW_ADMIN_PORT: ${MLFLOW_ADMIN_PORT}
+      MLFLOW_ADMIN_UPSTREAM_URL: http://mlflow:${MLFLOW_PORT}
+      MLFLOW_ADMIN_SERVICE_USERNAME: ${MLFLOW_AUTH_ADMIN_USERNAME:-admin}
+      MLFLOW_ADMIN_SERVICE_PASSWORD: ${MLFLOW_AUTH_ADMIN_PASSWORD}
+      MLFLOW_ADMIN_APP_USERNAME: ${MLFLOW_ADMIN_APP_USERNAME:-adminapp}
+      MLFLOW_ADMIN_APP_PASSWORD: ${MLFLOW_ADMIN_APP_PASSWORD:-change_me_admin_app_password}
+      MLFLOW_ADMIN_APP_SECRET_KEY: ${MLFLOW_ADMIN_APP_SECRET_KEY:-change_me_mlflow_admin_app_secret_key}
+      MLFLOW_ADMIN_HTTP_TIMEOUT: ${MLFLOW_ADMIN_HTTP_TIMEOUT:-10}
+      MLFLOW_ADMIN_AUTH_DB_URI: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${MLFLOW_AUTH_POSTGRES_DB}
+      MLFLOW_ADMIN_AUTH_DB_TIMEOUT: ${MLFLOW_ADMIN_AUTH_DB_TIMEOUT:-5}
+    restart: unless-stopped
+    networks: [mlops]

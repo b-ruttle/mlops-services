@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MLflow User Management</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    h1, h2 { margin-bottom: 0.5rem; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+    th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
+    th { background: #f5f5f5; }
+    form.inline { display: inline; margin: 0; }
+    .flash { padding: 0.6rem; margin: 0.5rem 0; border-radius: 4px; }
+    .success { background: #e9f7ef; color: #1f6f3c; }
+    .error { background: #fdecea; color: #a30d11; }
+    .warning { background: #fff7e6; color: #8a5a00; }
+    .section { margin-top: 1.5rem; }
+    input, select, button { padding: 0.4rem; }
+    .row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+  </style>
+</head>
+<body>
+  <h1>MLflow User Management</h1>
+  <p>Connected to MLflow using service account <strong>{{ service_username }}</strong>.</p>
+
+  <form method="post" action="{{ url_for('logout') }}">
+    <button type="submit">Sign Out</button>
+  </form>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  {% if warning %}
+    <div class="flash warning">{{ warning }}</div>
+  {% endif %}
+
+  <div class="section">
+    <h2>Create User</h2>
+    <form method="post" action="{{ url_for('create_user') }}">
+      <div class="row">
+        <input name="username" placeholder="username" required>
+        <input name="password" type="password" placeholder="password" required>
+        <select name="role" required>
+          {% for role in role_options %}
+            <option value="{{ role.value }}" {% if role.value == 'READ' %}selected{% endif %}>{{ role.label }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit">Create</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>Manage Existing User</h2>
+    <form method="post" action="{{ url_for('set_role') }}">
+      <div class="row">
+        <input name="username" placeholder="username" required>
+        <select name="role" required>
+          {% for role in role_options %}
+            <option value="{{ role.value }}" {% if role.value == 'READ' %}selected{% endif %}>{{ role.label }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit">Apply Role</button>
+      </div>
+    </form>
+    <form method="post" action="{{ url_for('reset_password') }}">
+      <div class="row" style="margin-top: 0.5rem;">
+        <input name="username" placeholder="username" required>
+        <input name="password" type="password" placeholder="new password" autocomplete="new-password" required>
+        <button type="submit">Reset Password</button>
+      </div>
+    </form>
+    <p>Non-admin roles are applied across all current experiments and registered models. You can also set roles directly from the table below.</p>
+    <form method="post" action="{{ url_for('delete_user') }}" onsubmit="return confirm('Delete this user?');">
+      <div class="row" style="margin-top: 0.5rem;">
+        <input name="username" placeholder="username" required>
+        <button type="submit">Delete User</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>Permission Levels</h2>
+    <p>Admin is the highest role and sits above resource permission levels. The table below replicates the first table in the MLflow basic-auth docs: <a href="{{ permissions_docs_url }}" target="_blank" rel="noopener noreferrer">MLflow basic-auth permissions</a>.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Permission</th>
+          <th>Read</th>
+          <th>Use</th>
+          <th>Update</th>
+          <th>Delete</th>
+          <th>Manage</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in permission_matrix %}
+          <tr>
+            <td>{{ row["permission"] }}</td>
+            <td>{{ row["read"] }}</td>
+            <td>{{ row["use"] }}</td>
+            <td>{{ row["update"] }}</td>
+            <td>{{ row["delete"] }}</td>
+            <td>{{ row["manage"] }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Existing Users</h2>
+    <p>
+      Source: <strong>{{ user_source }}</strong>.
+      Accounts shown (all users): <strong>{{ users_count }}</strong>.
+      Admins: <strong>{{ admin_count }}</strong>.
+      Permission grants: <strong>{{ total_permissions }}</strong>.
+    </p>
+    <ul>
+      <li><strong>Global Permission</strong>: the single summary label this app shows for a user.</li>
+      <li><strong>ADMIN</strong>: user is admin (<code>is_admin=true</code>), so full access.</li>
+      <li><strong>READ / EDIT / MANAGE / NO_PERMISSIONS</strong>: all explicit grants found for that user agree on one value.</li>
+      <li><strong>UNSET</strong>: the DB has no explicit experiment/model permission rows for that user (non-admin). It means "no explicit entries found," not necessarily "cannot access anything."</li>
+      <li><strong>MIXED</strong>: explicit grants are inconsistent across resources (example: <code>READ</code> on one experiment, <code>MANAGE</code> on another), so there is no single global value.</li>
+    </ul>
+    <table>
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Admin</th>
+          <th>Global Permission</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if users %}
+          {% for user in users %}
+            <tr>
+              <td>{{ user.username }}</td>
+              <td>{{ user.is_admin }}</td>
+              <td>{{ user.global_permission }}</td>
+              <td>
+                <form class="inline" method="post" action="{{ url_for('set_role') }}">
+                  <input type="hidden" name="username" value="{{ user.username }}">
+                  <select name="role">
+                    {% for role in role_options %}
+                      <option value="{{ role.value }}" {% if role.value == user.suggested_role %}selected{% endif %}>{{ role.label }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit">Apply</button>
+                </form>
+                <form class="inline" method="post" action="{{ url_for('delete_user') }}" onsubmit="return confirm('Delete user {{ user.username }}?');">
+                  <input type="hidden" name="username" value="{{ user.username }}">
+                  <button type="submit">Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="4">No users found for this view/filter.</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>
