@@ -3,6 +3,7 @@ include:
   - ./rustfs/docker-compose.yml
   - ./mlflow/docker-compose.yml
   - ./mlflow-admin/docker-compose.yml
+  - ./airflow/docker-compose.yml
   - ./nginx/docker-compose.yml
 
 networks:

@@ -5,6 +5,7 @@ Local MLOps services for development and testing, orchestrated with Docker Compo
 The stack includes:
 - MLflow (tracking server)
 - MLflow Admin App (simple user management UI for MLflow auth users)
+- Airflow (scheduler and DAG UI for local orchestration)
 - Postgres (MLflow backend store plus separate auth and Feast DBs)
 - RustFS (S3-compatible object store)
 - Nginx (single HTTP entrypoint with path-based routing)
@@ -21,6 +22,9 @@ Set strong values for:
 - `MLFLOW_AUTH_ADMIN_PASSWORD`
 - `MLFLOW_ADMIN_APP_PASSWORD`
 - `MLFLOW_ADMIN_APP_SECRET_KEY`
+- `AIRFLOW_FERNET_KEY`
+- `AIRFLOW_SECRET_KEY`
+- `AIRFLOW_ADMIN_PASSWORD`
 
 2. Start the stack:
 ```bash
@@ -30,6 +34,7 @@ make up
 3. Open services (no hosts-file edits required by default):
 - `http://localhost/mlflow`
 - `http://localhost/mlflow-admin` (admin app login)
+- `http://localhost/airflow` (Airflow UI)
 - `http://localhost/rustfs` (RustFS console)
 - `http://localhost/` (simple index page)
 
@@ -82,6 +87,7 @@ Default public endpoint values from `env/config.env`:
 Default service paths:
 - `MLFLOW_BASE_PATH=mlflow`
 - `MLFLOW_ADMIN_BASE_PATH=mlflow-admin`
+- `AIRFLOW_BASE_PATH=airflow`
 - `RUSTFS_BASE_PATH=rustfs`
 
 Path variables are normalized by `scripts/compose.sh`:
@@ -103,15 +109,30 @@ If you need a template for secrets, use `env/secrets.env.example`.
 - Nginx routes to service names inside Docker (for example `mlflow:5000`, `rustfs:9001`).
 - Nginx is the only web entrypoint exposed on the host:
   - `${NGINX_PORT_BIND}:${NGINX_PORT}:80`
-- RustFS console, MLflow, and mlflow-admin are not exposed directly on host ports.
+- RustFS console, MLflow, mlflow-admin, and Airflow are not exposed directly on host ports.
 - RustFS's S3-compatible API is also not exposed on a public Nginx path.
 - Postgres remains internal to Docker.
 
 Current HTTP routing:
 - `${MLFLOW_BASE_PATH}` -> `mlflow:${MLFLOW_PORT}`
 - `${MLFLOW_ADMIN_BASE_PATH}` -> `mlflow-admin:${MLFLOW_ADMIN_PORT}`
+- `${AIRFLOW_BASE_PATH}` -> `airflow-webserver:${AIRFLOW_PORT}`
 - `${RUSTFS_BASE_PATH}` -> `rustfs:${RUSTFS_CONSOLE_PORT}`
 - `/` -> small HTML index page
+
+## Airflow
+
+Airflow is configured for local development with:
+- `LocalExecutor`
+- Postgres metadata stored in `${AIRFLOW_POSTGRES_DB}`
+- one-shot bootstrap containers that create the metadata DB, run migrations, and ensure an admin user exists
+- the web UI published only through nginx at `${AIRFLOW_BASE_PATH}`
+
+Default bootstrap credentials come from `env/secrets.env`:
+- `AIRFLOW_ADMIN_USERNAME` (default `admin`)
+- `AIRFLOW_ADMIN_PASSWORD`
+
+Default DAGs live in [`airflow/dags`](/home/trevi/projects/mlops-services/airflow/dags) and are mounted into `/opt/airflow/dags` for local development.
 
 HTTP only for now (no TLS yet). The Nginx config is structured so HTTPS can be added later at the proxy.
 
