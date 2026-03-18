@@ -26,6 +26,11 @@ Set strong values for:
 - `AIRFLOW_SECRET_KEY`
 - `AIRFLOW_ADMIN_PASSWORD`
 
+Generate `AIRFLOW_FERNET_KEY` with:
+```bash
+python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'
+```
+
 2. Start the stack:
 ```bash
 make up
