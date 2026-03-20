@@ -12,6 +12,26 @@ source "${ENV_DIR}/config.env"
 source "${ENV_DIR}/secrets.env"
 set +a
 
+resolve_repo_dir_var() {
+  local var_name="$1"
+  local fallback_path="$2"
+  local value="${!var_name:-}"
+
+  if [[ -z "${value}" ]]; then
+    if [[ -d "${fallback_path}" ]]; then
+      value="${fallback_path}"
+    else
+      return
+    fi
+  elif [[ "${value}" != /* ]]; then
+    value="${ROOT_DIR}/${value}"
+  fi
+
+  value="$(cd "${value}" && pwd)"
+  printf -v "${var_name}" '%s' "${value}"
+  export "${var_name}"
+}
+
 normalize_base_path_var() {
   local var_name="$1"
   local default_value="$2"
@@ -48,6 +68,8 @@ normalize_existing_base_path_vars() {
 }
 
 normalize_existing_base_path_vars
+
+resolve_repo_dir_var "MLOPS_EXAMPLES_DIR" "${ROOT_DIR}/../mlops-examples"
 
 cd "${ROOT_DIR}"
 exec docker compose "$@"

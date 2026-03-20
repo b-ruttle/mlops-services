@@ -9,22 +9,25 @@ x-airflow-common-env: &airflow-common-env
   AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-change_me_airflow_web_secret_key}
   AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "True"
   MLOPS_NETWORK: ${MLOPS_NETWORK}
-  MLOPS_EXAMPLES_HOST_DIR: ${MLOPS_EXAMPLES_DIR:-/home/trevi/projects/mlops-examples}
+  MLOPS_EXAMPLES_HOST_DIR: ${MLOPS_EXAMPLES_DIR:?Set MLOPS_EXAMPLES_DIR to your mlops-examples checkout}
   PUBLIC_FQDN: ${PUBLIC_FQDN}
   MLFLOW_BASE_PATH: ${MLFLOW_BASE_PATH}
-  POSTGRES_HOST: mlflow-postgres
+  MLFLOW_TRACKING_URI: http://mlflow:${MLFLOW_PORT}
+  POSTGRES_HOST: postgres
   POSTGRES_PORT: ${POSTGRES_PORT}
   POSTGRES_USER: ${POSTGRES_USER}
   POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
   AWS_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY}
   AWS_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY}
   AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+  MLFLOW_AUTH_ADMIN_USERNAME: ${MLFLOW_AUTH_ADMIN_USERNAME:-admin}
+  MLFLOW_AUTH_ADMIN_PASSWORD: ${MLFLOW_AUTH_ADMIN_PASSWORD:?Set MLFLOW_AUTH_ADMIN_PASSWORD in env/secrets.env}
   MLFLOW_TRACKING_USERNAME: ${MLFLOW_TRACKING_USERNAME:-}
   MLFLOW_TRACKING_PASSWORD: ${MLFLOW_TRACKING_PASSWORD:-}
 
 x-airflow-common-volumes: &airflow-common-volumes
-  - ../../mlops-examples/dags:/opt/airflow/dags
-  - ../../mlops-examples:/opt/mlops-examples
+  - ${MLOPS_EXAMPLES_DIR:?Set MLOPS_EXAMPLES_DIR to your mlops-examples checkout}/dags:/opt/airflow/dags
+  - ${MLOPS_EXAMPLES_DIR:?Set MLOPS_EXAMPLES_DIR to your mlops-examples checkout}:/opt/mlops-examples
   - /var/run/docker.sock:/var/run/docker.sock
   - airflow_logs:/opt/airflow/logs
   - airflow_plugins:/opt/airflow/plugins
@@ -32,7 +35,6 @@ x-airflow-common-volumes: &airflow-common-volumes
 services:
   airflow-db-init:
     image: ${POSTGRES_IMAGE}
-    container_name: mlops-airflow-db-init
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,7 +53,6 @@ services:
 
   airflow-init:
     image: ${AIRFLOW_IMAGE}
-    container_name: mlops-airflow-init
     depends_on:
       airflow-db-init:
         condition: service_completed_successfully
@@ -65,8 +66,8 @@ services:
       AIRFLOW_ADMIN_EMAIL: ${AIRFLOW_ADMIN_EMAIL:-airflow-admin@example.local}
     volumes:
       - ./scripts/init-airflow.sh:/scripts/init-airflow.sh:ro
-      - ../../mlops-examples/dags:/opt/airflow/dags
-      - ../../mlops-examples:/opt/mlops-examples
+      - ${MLOPS_EXAMPLES_DIR:?Set MLOPS_EXAMPLES_DIR to your mlops-examples checkout}/dags:/opt/airflow/dags
+      - ${MLOPS_EXAMPLES_DIR:?Set MLOPS_EXAMPLES_DIR to your mlops-examples checkout}:/opt/mlops-examples
       - airflow_logs:/opt/airflow/logs
       - airflow_plugins:/opt/airflow/plugins
     entrypoint: [ "/bin/bash", "/scripts/init-airflow.sh" ]
@@ -75,7 +76,6 @@ services:
 
   airflow-webserver:
     image: ${AIRFLOW_IMAGE}
-    container_name: mlops-airflow-webserver
     depends_on:
       airflow-init:
         condition: service_completed_successfully
@@ -101,7 +101,6 @@ services:
 
   airflow-scheduler:
     image: ${AIRFLOW_IMAGE}
-    container_name: mlops-airflow-scheduler
     depends_on:
       airflow-init:
         condition: service_completed_successfully

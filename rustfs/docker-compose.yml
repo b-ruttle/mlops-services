@@ -1,7 +1,6 @@
 services:
   rustfs:
     image: ${RUSTFS_IMAGE}
-    container_name: mlflow-rustfs
     expose:
       - "${RUSTFS_PORT}"
       - "${RUSTFS_CONSOLE_PORT}"
@@ -16,9 +15,8 @@ services:
     restart: unless-stopped
     networks: [mlops]
 
-  volume-permission-helper:
+  rustfs-volume-permissions:
     image: ${ALPINE_IMAGE}
-    container_name: rustfs-volume-permissions
     volumes:
       - ${RUSTFS_DATA_DIR}:/data
     command: >
@@ -30,12 +28,11 @@ services:
     restart: "no"
     networks: [mlops]
 
-  rustfs_init:
+  rustfs-init:
     image: ${MC_IMAGE}
-    container_name: rustfs-init-buckets
     depends_on:
       - rustfs
-      - volume-permission-helper
+      - rustfs-volume-permissions
     entrypoint: >
       /bin/sh -c "
       echo 'Waiting for RustFS S3 endpoint...';

@@ -1,7 +1,6 @@
 services:
   postgres:
     image: ${POSTGRES_IMAGE}
-    container_name: mlflow-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -18,7 +17,6 @@ services:
 
   postgres-init:
     image: ${POSTGRES_IMAGE}
-    container_name: mlflow-postgres-init
     depends_on:
       postgres:
         condition: service_healthy

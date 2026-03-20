@@ -5,7 +5,6 @@ services:
       dockerfile: Dockerfile
       args:
         PYTHON_IMAGE: ${PYTHON_IMAGE}
-    container_name: mlflow-admin
     depends_on:
       - mlflow
     expose:
