@@ -5,13 +5,12 @@ services:
       dockerfile: Dockerfile
       args:
         PYTHON_IMAGE: ${PYTHON_IMAGE}
-    container_name: mlflow-server
     depends_on:
       postgres:
         condition: service_healthy
       postgres-init:
         condition: service_completed_successfully
-      rustfs_init:
+      rustfs-init:
         condition: service_completed_successfully
     expose:
       - "${MLFLOW_PORT}"
