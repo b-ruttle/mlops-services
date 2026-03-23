@@ -43,6 +43,12 @@ make up
 - `http://localhost/rustfs` (RustFS console)
 - `http://localhost/` (simple index page)
 
+Credential map:
+- MLflow UI: sign in with a personal MLflow user account, not the bootstrap admin account
+- MLflow Admin App: `MLFLOW_ADMIN_APP_USERNAME` / `MLFLOW_ADMIN_APP_PASSWORD`
+- Airflow UI: `AIRFLOW_ADMIN_USERNAME` / `AIRFLOW_ADMIN_PASSWORD`
+- RustFS Console: `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY`
+
 Storage note:
 - The RustFS web console is exposed at `/rustfs`.
 - The S3-compatible API remains internal to the Docker network and is used by MLflow at `http://rustfs:${RUSTFS_PORT}`.
