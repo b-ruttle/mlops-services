@@ -14,8 +14,9 @@ The stack includes:
 
 1. Configure secrets:
 ```bash
-cp env/secrets.env.example env/secrets.env
-# then edit env/secrets.env
+./scripts/generate-secrets-env.sh
+# or copy the example and edit it manually:
+# cp env/secrets.env.example env/secrets.env
 ```
 Set strong values for:
 - `MLFLOW_FLASK_SERVER_SECRET_KEY`
