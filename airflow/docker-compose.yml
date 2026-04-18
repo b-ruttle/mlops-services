@@ -2,6 +2,7 @@ x-airflow-common-env: &airflow-common-env
   AIRFLOW_HOME: /opt/airflow
   AIRFLOW__CORE__EXECUTOR: LocalExecutor
   AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:?Set AIRFLOW_FERNET_KEY in env/secrets.env}
+  AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
   AIRFLOW__CORE__LOAD_EXAMPLES: "False"
   AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${AIRFLOW_POSTGRES_DB}
   AIRFLOW__WEBSERVER__BASE_URL: http://${PUBLIC_FQDN}:${NGINX_PORT}${AIRFLOW_BASE_PATH}
@@ -24,11 +25,14 @@ x-airflow-common-env: &airflow-common-env
   MLFLOW_AUTH_ADMIN_PASSWORD: ${MLFLOW_AUTH_ADMIN_PASSWORD:?Set MLFLOW_AUTH_ADMIN_PASSWORD in env/secrets.env}
   MLFLOW_TRACKING_USERNAME: ${MLFLOW_TRACKING_USERNAME:-}
   MLFLOW_TRACKING_PASSWORD: ${MLFLOW_TRACKING_PASSWORD:-}
+  AIRFLOW_PROJECTS_ROOT: /opt/airflow/projects-root
+  AIRFLOW_SHARED_DAGS_DIR: /opt/mlops-examples/dags
 
 x-airflow-common-volumes: &airflow-common-volumes
-  - ${MLOPS_EXAMPLES_DIR:?Set MLOPS_EXAMPLES_DIR to your mlops-examples checkout}/dags:/opt/airflow/dags
   - ${MLOPS_EXAMPLES_DIR:?Set MLOPS_EXAMPLES_DIR to your mlops-examples checkout}:/opt/mlops-examples
+  - ${AIRFLOW_PROJECTS_DIR:?Set AIRFLOW_PROJECTS_DIR in env/config.env or your shell}:/opt/airflow/projects-root:ro
   - /var/run/docker.sock:/var/run/docker.sock
+  - airflow_dags:/opt/airflow/dags
   - airflow_logs:/opt/airflow/logs
   - airflow_plugins:/opt/airflow/plugins
 
@@ -66,11 +70,14 @@ services:
       AIRFLOW_ADMIN_EMAIL: ${AIRFLOW_ADMIN_EMAIL:-airflow-admin@example.local}
     volumes:
       - ./scripts/init-airflow.sh:/scripts/init-airflow.sh:ro
-      - ${MLOPS_EXAMPLES_DIR:?Set MLOPS_EXAMPLES_DIR to your mlops-examples checkout}/dags:/opt/airflow/dags
+      - ./scripts/prepare-airflow-projects.sh:/scripts/prepare-airflow-projects.sh:ro
+      - ./scripts/run-airflow-service.sh:/scripts/run-airflow-service.sh:ro
       - ${MLOPS_EXAMPLES_DIR:?Set MLOPS_EXAMPLES_DIR to your mlops-examples checkout}:/opt/mlops-examples
+      - ${AIRFLOW_PROJECTS_DIR:?Set AIRFLOW_PROJECTS_DIR in env/config.env or your shell}:/opt/airflow/projects-root:ro
+      - airflow_dags:/opt/airflow/dags
       - airflow_logs:/opt/airflow/logs
       - airflow_plugins:/opt/airflow/plugins
-    entrypoint: [ "/bin/bash", "/scripts/init-airflow.sh" ]
+    entrypoint: [ "/bin/bash", "/scripts/run-airflow-service.sh", "/scripts/init-airflow.sh" ]
     restart: "no"
     networks: [ mlops ]
 
@@ -95,7 +102,16 @@ services:
       timeout: 5s
       retries: 12
       start_period: 30s
-    volumes: *airflow-common-volumes
+    volumes:
+      - ./scripts/prepare-airflow-projects.sh:/scripts/prepare-airflow-projects.sh:ro
+      - ./scripts/run-airflow-service.sh:/scripts/run-airflow-service.sh:ro
+      - ${MLOPS_EXAMPLES_DIR:?Set MLOPS_EXAMPLES_DIR to your mlops-examples checkout}:/opt/mlops-examples
+      - ${AIRFLOW_PROJECTS_DIR:?Set AIRFLOW_PROJECTS_DIR in env/config.env or your shell}:/opt/airflow/projects-root:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - airflow_dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - airflow_plugins:/opt/airflow/plugins
+    entrypoint: [ "/bin/bash", "/scripts/run-airflow-service.sh" ]
     restart: unless-stopped
     networks: [ mlops ]
 
@@ -110,10 +126,20 @@ services:
     environment:
       <<: *airflow-common-env
     command: [ "airflow", "scheduler" ]
-    volumes: *airflow-common-volumes
+    volumes:
+      - ./scripts/prepare-airflow-projects.sh:/scripts/prepare-airflow-projects.sh:ro
+      - ./scripts/run-airflow-service.sh:/scripts/run-airflow-service.sh:ro
+      - ${MLOPS_EXAMPLES_DIR:?Set MLOPS_EXAMPLES_DIR to your mlops-examples checkout}:/opt/mlops-examples
+      - ${AIRFLOW_PROJECTS_DIR:?Set AIRFLOW_PROJECTS_DIR in env/config.env or your shell}:/opt/airflow/projects-root:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - airflow_dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - airflow_plugins:/opt/airflow/plugins
+    entrypoint: [ "/bin/bash", "/scripts/run-airflow-service.sh" ]
     restart: unless-stopped
     networks: [ mlops ]
 
 volumes:
+  airflow_dags:
   airflow_logs:
   airflow_plugins:

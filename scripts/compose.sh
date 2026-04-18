@@ -70,6 +70,7 @@ normalize_existing_base_path_vars() {
 normalize_existing_base_path_vars
 
 resolve_repo_dir_var "MLOPS_EXAMPLES_DIR" "${ROOT_DIR}/../mlops-examples"
+resolve_repo_dir_var "AIRFLOW_PROJECTS_DIR" "${ROOT_DIR}/.."
 
 cd "${ROOT_DIR}"
 exec docker compose "$@"

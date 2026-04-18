@@ -1,4 +1,4 @@
-.PHONY: help up down ps logs test
+.PHONY: help up down ps logs test airflow-projects-list airflow-projects-validate
 
 help:
 	@echo "Make targets:"
@@ -8,6 +8,8 @@ help:
 	@echo "  make logs          Tail logs (all services)"
 	@echo "  make logs SERVICE=mlflow   Tail logs for one service"
 	@echo "  make test          Run smoke test"
+	@echo "  make airflow-projects-list      Show discoverable Airflow projects"
+	@echo "  make airflow-projects-validate  Validate project manifests and mount setup"
 
 up:
 	./scripts/compose.sh up -d --build
@@ -24,3 +26,9 @@ logs:
 
 test:
 	./scripts/smoke-test.sh
+
+airflow-projects-list:
+	./scripts/airflow-projects.sh list
+
+airflow-projects-validate:
+	./scripts/airflow-projects.sh validate
