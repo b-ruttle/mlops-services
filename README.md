@@ -151,7 +151,7 @@ Airflow project discovery now uses:
 - `MLOPS_EXAMPLES_DIR`: shared example repo checkout resolved by `scripts/compose.sh` from your shell or the default sibling repo layout
 - `AIRFLOW_PROJECTS_DIR=..`: host-side root that contains sibling project repos
 
-At runtime, Airflow mounts the whole `AIRFLOW_PROJECTS_DIR` root once, then a startup wrapper scans each repo under that root for a project-owned `.airflow-project.env` manifest before `airflow-init`, `airflow-webserver`, or `airflow-scheduler` starts. For every matching repo, the wrapper adds that repo's DAG directory into `/opt/airflow/dags` and sources any optional project env file.
+At runtime, Airflow mounts the whole `AIRFLOW_PROJECTS_DIR` root once, then a startup wrapper scans each repo under that root for a project-owned `.airflow-project.env` manifest before `airflow-init`, `airflow-webserver`, or `airflow-scheduler` starts. For every matching repo, the wrapper adds that repo's DAG directory into `/opt/airflow/dags`, sources any optional project env file, and exports a derived `<PROJECT>_REPO_HOST_DIR` for DockerOperator mounts.
 
 The shared `mlops-examples/dags` source is always included automatically, so existing example DAGs keep working without any extra registration step.
 
@@ -176,7 +176,9 @@ Path rules:
 - The manifest itself must live at the project repo root inside `AIRFLOW_PROJECTS_DIR`.
 - `DAGS_DIR` and `ENV_FILE` are resolved relative to that repo root.
 - Project env vars are loaded into `airflow-init`, `airflow-webserver`, and `airflow-scheduler` in alphabetical repo order.
-- Prefer namespaced variables like `MY_PROJECT_REPO_HOST_DIR` and `MY_PROJECT_RUNNER_IMAGE` so two projects do not fight over generic names.
+- Discovery automatically exports `<PROJECT>_REPO_HOST_DIR`, where `<PROJECT>` is `PROJECT_NAME` uppercased with non-shell-name characters normalized to underscores. For example, `PROJECT_NAME=gnss` produces `GNSS_REPO_HOST_DIR`, and `PROJECT_NAME=my-project` produces `MY_PROJECT_REPO_HOST_DIR`.
+- `<PROJECT>_REPO_HOST_DIR` is derived from the host-side checkout path under `AIRFLOW_PROJECTS_DIR`, not from the internal Airflow container path under `/opt/airflow/projects-root`. DAGs can pass it directly to DockerOperator bind mounts such as `${GNSS_REPO_HOST_DIR}:/work`.
+- Prefer namespaced variables like `MY_PROJECT_RUNNER_IMAGE` so two projects do not fight over generic names. Do not define `<PROJECT>_REPO_HOST_DIR` manually in the project env file; discovery writes the authoritative value.
 
 ### Onboarding A New Project Repo
 
@@ -203,9 +205,14 @@ Generic example project env file:
 
 ```dotenv
 # in /path/to/repo/airflow/airflow.env
-MY_PROJECT_REPO_HOST_DIR=/opt/host/path/to/repo
 MY_PROJECT_RUNNER_IMAGE=my-project-runner
 MY_PROJECT_CONFIG_PATH=configs/dev.yaml
+```
+
+The generated Airflow project env bundle will include:
+
+```dotenv
+export MY_PROJECT_REPO_HOST_DIR=/path/to/repo
 ```
 
 ### Helper Commands

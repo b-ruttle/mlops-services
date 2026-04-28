@@ -26,6 +26,7 @@ x-airflow-common-env: &airflow-common-env
   MLFLOW_TRACKING_USERNAME: ${MLFLOW_TRACKING_USERNAME:-}
   MLFLOW_TRACKING_PASSWORD: ${MLFLOW_TRACKING_PASSWORD:-}
   AIRFLOW_PROJECTS_ROOT: /opt/airflow/projects-root
+  AIRFLOW_PROJECTS_HOST_ROOT: ${AIRFLOW_PROJECTS_DIR:?Set AIRFLOW_PROJECTS_DIR in env/config.env or your shell}
   AIRFLOW_SHARED_DAGS_DIR: /opt/mlops-examples/dags
 
 x-airflow-common-volumes: &airflow-common-volumes
