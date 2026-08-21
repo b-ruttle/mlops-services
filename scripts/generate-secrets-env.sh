@@ -66,7 +66,13 @@ import secrets
 
 
 def pw(nbytes=24):
-    return secrets.token_urlsafe(nbytes)
+    # token_urlsafe may begin with "-", which some CLIs parse as an option even
+    # when the value is quoted. Rejection sampling preserves the same format and
+    # entropy while guaranteeing a safe first character for positional use.
+    while True:
+        value = secrets.token_urlsafe(nbytes)
+        if value[0].isalnum():
+            return value
 
 
 def key_hex(nbytes=32):
@@ -74,7 +80,10 @@ def key_hex(nbytes=32):
 
 
 def fernet_key():
-    return base64.urlsafe_b64encode(os.urandom(32)).decode()
+    while True:
+        value = base64.urlsafe_b64encode(os.urandom(32)).decode()
+        if value[0].isalnum():
+            return value
 
 
 print("# --- Postgres ---")

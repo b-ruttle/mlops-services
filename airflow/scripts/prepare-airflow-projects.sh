@@ -2,11 +2,12 @@
 set -euo pipefail
 
 DAGS_ROOT="${AIRFLOW__CORE__DAGS_FOLDER:-/opt/airflow/dags}"
+PLATFORM_DAGS_DIR="${AIRFLOW_PLATFORM_DAGS_DIR:-/opt/airflow/platform-dags}"
 PROJECTS_ROOT="${AIRFLOW_PROJECTS_ROOT:-/opt/airflow/projects-root}"
 PROJECTS_HOST_ROOT="${AIRFLOW_PROJECTS_HOST_ROOT:-}"
-SHARED_DAGS_DIR="${AIRFLOW_SHARED_DAGS_DIR:-/opt/mlops-examples/dags}"
 MANIFEST_NAME="${AIRFLOW_PROJECT_MANIFEST_NAME:-.airflow-project.env}"
 PROJECT_ENV_BUNDLE="${DAGS_ROOT}/.project-env/all-projects.env"
+declare -A REGISTERED_DAG_SOURCES=()
 
 sanitize_name() {
   local value="$1"
@@ -48,7 +49,13 @@ register_dag_source() {
     exit 1
   fi
 
+  if [[ -n "${REGISTERED_DAG_SOURCES[${sanitized_name}]:-}" ]]; then
+    echo "ERROR: duplicate Airflow project name '${name}' conflicts with ${REGISTERED_DAG_SOURCES[${sanitized_name}]}" >&2
+    exit 1
+  fi
+
   ln -sfn "${source_dir}" "${DAGS_ROOT}/${sanitized_name}"
+  REGISTERED_DAG_SOURCES["${sanitized_name}"]="${source_dir}"
 }
 
 prepare_dags_root() {
@@ -120,10 +127,15 @@ prepare_registered_projects() {
     register_dag_source "${project_name}" "${dags_dir}"
     append_env_file "${env_file}"
     append_project_repo_host_dir "${project_name}" "${project_dir}"
-  done < <(find "${PROJECTS_ROOT}" -mindepth 2 -maxdepth 2 -type f -name "${MANIFEST_NAME}" -print0 | sort -z)
+  done < <(
+    find "${PROJECTS_ROOT}" \
+      \( -type d \( -name .git -o -name .venv -o -name node_modules -o -name __pycache__ -o -name volumes -o ! -readable -o ! -executable \) -prune \) -o \
+      \( -mindepth 2 -type f -name "${MANIFEST_NAME}" -print0 \) |
+      sort -z
+  )
 }
 
 prepare_dags_root
 prepare_project_env_root
-register_dag_source "mlops-examples" "${SHARED_DAGS_DIR}"
+register_dag_source "mlops-services" "${PLATFORM_DAGS_DIR}"
 prepare_registered_projects

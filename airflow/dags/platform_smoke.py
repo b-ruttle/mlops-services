@@ -6,13 +6,13 @@ from airflow.operators.bash import BashOperator
 
 
 with DAG(
-    dag_id="demo",
-    description="Simple demo DAG to verify Airflow is scheduling and running tasks.",
+    dag_id="mlops_services_smoke",
+    description="Platform smoke DAG that verifies Airflow scheduling and task execution.",
     start_date=datetime(2022, 1, 1),
     schedule=None,
     catchup=False,
     is_paused_upon_creation=False,
-    tags=["demo"],
+    tags=["mlops-services", "smoke"],
 ) as dag:
     hello = BashOperator(
         task_id="hello",

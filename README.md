@@ -139,25 +139,33 @@ Airflow is configured for local development with:
 - Postgres metadata stored in `${AIRFLOW_POSTGRES_DB}`
 - one-shot bootstrap containers that create the metadata DB, run migrations, and ensure an admin user exists
 - the web UI published only through nginx at `${AIRFLOW_BASE_PATH}`
-- automatic DAG discovery from a shared `mlops-examples` repo plus any projects registered under `AIRFLOW_PROJECTS_DIR`
-  via project-owned manifest files
+- a platform-owned smoke DAG plus automatic discovery of projects registered under
+  `AIRFLOW_PROJECTS_DIR` via project-owned manifest files
 
 Default bootstrap credentials come from `env/secrets.env`:
 - `AIRFLOW_ADMIN_USERNAME` (default `admin`)
 - `AIRFLOW_ADMIN_PASSWORD`
 
-Airflow project discovery now uses:
+Airflow project discovery uses `AIRFLOW_PROJECTS_DIR`, a host-side root that contains
+participating project repos. Relative values are resolved from the `mlops-services` root;
+the committed `../../..` value is intended to select the surrounding projects workspace.
 
-- `MLOPS_EXAMPLES_DIR`: shared example repo checkout resolved by `scripts/compose.sh` from your shell or the default sibling repo layout
-- `AIRFLOW_PROJECTS_DIR=..`: host-side root that contains sibling project repos
+At runtime, Airflow mounts the whole `AIRFLOW_PROJECTS_DIR` root once, then a startup
+wrapper recursively scans that root for project-owned `.airflow-project.env` manifests
+before `airflow-init`, `airflow-webserver`, or `airflow-scheduler` starts. Git metadata,
+virtual environments, `node_modules`, and Python cache directories are pruned. For every
+matching repo, the wrapper adds that repo's DAG directory into `/opt/airflow/dags`, sources
+any optional project env file, and exports a derived `<PROJECT>_REPO_HOST_DIR` for
+DockerOperator mounts.
 
-At runtime, Airflow mounts the whole `AIRFLOW_PROJECTS_DIR` root once, then a startup wrapper scans each repo under that root for a project-owned `.airflow-project.env` manifest before `airflow-init`, `airflow-webserver`, or `airflow-scheduler` starts. For every matching repo, the wrapper adds that repo's DAG directory into `/opt/airflow/dags`, sources any optional project env file, and exports a derived `<PROJECT>_REPO_HOST_DIR` for DockerOperator mounts.
-
-The shared `mlops-examples/dags` source is always included automatically, so existing example DAGs keep working without any extra registration step.
+The platform smoke DAG is owned and mounted by `mlops-services`. External repositories,
+including `mlops-examples`, are optional and use the same manifest contract.
 
 ### Airflow Project Registration
 
-Each project self-registers from its own repo by adding a manifest file named `.airflow-project.env` at the repo root. A template lives at [`airflow/project-manifest.example.env`](/mnt/c/Users/brent/Documents/mlops/repos/mlops-services/airflow/project-manifest.example.env).
+Each project self-registers from its own repo by adding a manifest file named
+`.airflow-project.env` at the repo root. A template lives at
+[`airflow/project-manifest.example.env`](airflow/project-manifest.example.env).
 
 ```dotenv
 PROJECT_NAME=my-project
@@ -174,11 +182,13 @@ Fields:
 Path rules:
 
 - The manifest itself must live at the project repo root inside `AIRFLOW_PROJECTS_DIR`.
+- Repositories may be nested below `AIRFLOW_PROJECTS_DIR`; discovery is recursive.
 - `DAGS_DIR` and `ENV_FILE` are resolved relative to that repo root.
 - Project env vars are loaded into `airflow-init`, `airflow-webserver`, and `airflow-scheduler` in alphabetical repo order.
 - Discovery automatically exports `<PROJECT>_REPO_HOST_DIR`, where `<PROJECT>` is `PROJECT_NAME` uppercased with non-shell-name characters normalized to underscores. For example, `PROJECT_NAME=gnss` produces `GNSS_REPO_HOST_DIR`, and `PROJECT_NAME=my-project` produces `MY_PROJECT_REPO_HOST_DIR`.
 - `<PROJECT>_REPO_HOST_DIR` is derived from the host-side checkout path under `AIRFLOW_PROJECTS_DIR`, not from the internal Airflow container path under `/opt/airflow/projects-root`. DAGs can pass it directly to DockerOperator bind mounts such as `${GNSS_REPO_HOST_DIR}:/work`.
 - Prefer namespaced variables like `MY_PROJECT_RUNNER_IMAGE` so two projects do not fight over generic names. Do not define `<PROJECT>_REPO_HOST_DIR` manually in the project env file; discovery writes the authoritative value.
+- Project names must be unique after normalization; duplicate names fail validation and startup.
 
 ### Onboarding A New Project Repo
 
@@ -217,7 +227,7 @@ export MY_PROJECT_REPO_HOST_DIR=/path/to/repo
 
 ### Helper Commands
 
-- `make airflow-projects-list` shows the built-in shared DAG source plus every discoverable project manifest under `AIRFLOW_PROJECTS_DIR`.
+- `make airflow-projects-list` shows every discoverable external project manifest under `AIRFLOW_PROJECTS_DIR`.
 - `make airflow-projects-validate` checks that every project-owned manifest points at a real DAG directory and optional env file.
 
 ### Design Choice And Tradeoffs
@@ -248,7 +258,7 @@ Why not a host-side sync or symlink-only approach:
 
 Known limitations:
 
-- Projects must live under the mounted `AIRFLOW_PROJECTS_DIR` root. If a repo lives elsewhere, either move it under that root or point `AIRFLOW_PROJECTS_DIR` at a higher-level directory that contains all relevant repos.
+- Projects must live somewhere under the mounted `AIRFLOW_PROJECTS_DIR` root. If a repo lives elsewhere, either move it under that root or point `AIRFLOW_PROJECTS_DIR` at a higher-level directory that contains all relevant repos.
 - Project env files are global to the Airflow processes. Use namespaced variable names to avoid collisions.
 - If two repos ship DAGs with the same Airflow `dag_id`, Airflow will still treat that as a conflict.
 
@@ -263,7 +273,7 @@ HTTP only for now (no TLS yet). The Nginx config is structured so HTTPS can be a
 - `make logs SERVICE=nginx` tail logs for one service
 - `make test` run smoke test
 - `make airflow-projects-list` show registered Airflow project DAG sources
-- `make airflow-projects-validate` validate Airflow project registrations and regenerate the project override compose file
+- `make airflow-projects-validate` validate Airflow project registrations
 
 ## Adding Another Service Behind Nginx
 

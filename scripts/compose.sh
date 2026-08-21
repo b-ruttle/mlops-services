@@ -21,7 +21,8 @@ resolve_repo_dir_var() {
     if [[ -d "${fallback_path}" ]]; then
       value="${fallback_path}"
     else
-      return
+      echo "ERROR: ${var_name} is not set and its default directory does not exist: ${fallback_path}" >&2
+      return 1
     fi
   elif [[ "${value}" != /* ]]; then
     value="${ROOT_DIR}/${value}"
@@ -69,7 +70,6 @@ normalize_existing_base_path_vars() {
 
 normalize_existing_base_path_vars
 
-resolve_repo_dir_var "MLOPS_EXAMPLES_DIR" "${ROOT_DIR}/../mlops-examples"
 resolve_repo_dir_var "AIRFLOW_PROJECTS_DIR" "${ROOT_DIR}/.."
 
 cd "${ROOT_DIR}"

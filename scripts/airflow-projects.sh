@@ -21,7 +21,8 @@ resolve_repo_dir_var() {
     if [[ -d "${fallback_path}" ]]; then
       value="${fallback_path}"
     else
-      return
+      echo "ERROR: ${var_name} is not set and its default directory does not exist: ${fallback_path}" >&2
+      return 1
     fi
   elif [[ "${value}" != /* ]]; then
     value="${ROOT_DIR}/${value}"
@@ -32,8 +33,22 @@ resolve_repo_dir_var() {
   export "${var_name}"
 }
 
-resolve_repo_dir_var "MLOPS_EXAMPLES_DIR" "${ROOT_DIR}/../mlops-examples"
 resolve_repo_dir_var "AIRFLOW_PROJECTS_DIR" "${ROOT_DIR}/.."
+
+find_project_manifests() {
+  find "${AIRFLOW_PROJECTS_DIR}" \
+    \( -type d \( -name .git -o -name .venv -o -name node_modules -o -name __pycache__ -o -name volumes -o ! -readable -o ! -executable \) -prune \) -o \
+    \( -mindepth 2 -type f -name "${MANIFEST_NAME}" -print0 \) |
+    sort -z
+}
+
+sanitize_name() {
+  local value="$1"
+  value="${value//[^a-zA-Z0-9._-]/-}"
+  value="${value##-}"
+  value="${value%%-}"
+  printf '%s\n' "${value}"
+}
 
 print_header() {
   printf '%-20s %-48s %-48s\n' "PROJECT" "DAGS_DIR" "ENV_FILE"
@@ -48,9 +63,7 @@ list_projects() {
   local env_file
 
   print_header
-  printf '%-20s %-48s %-48s\n' "mlops-examples" "${MLOPS_EXAMPLES_DIR}/dags" "-"
-
-  while IFS= read -r manifest_file; do
+  while IFS= read -r -d '' manifest_file; do
     repo_dir="$(dirname "${manifest_file}")"
     unset PROJECT_NAME DAGS_DIR ENV_FILE
     # shellcheck source=/dev/null
@@ -64,7 +77,7 @@ list_projects() {
     fi
 
     printf '%-20s %-48s %-48s\n' "${project_name}" "${dags_dir}" "${env_file}"
-  done < <(find "${AIRFLOW_PROJECTS_DIR}" -mindepth 2 -maxdepth 2 -type f -name "${MANIFEST_NAME}" | sort)
+  done < <(find_project_manifests)
 }
 
 validate_projects() {
@@ -73,29 +86,37 @@ validate_projects() {
   local project_name
   local dags_dir
   local env_file
+  local sanitized_name
   local had_error=0
+  local -A seen_names=()
 
   [[ -d "${AIRFLOW_PROJECTS_DIR}" ]] || {
     echo "ERROR: AIRFLOW_PROJECTS_DIR does not exist: ${AIRFLOW_PROJECTS_DIR}" >&2
     return 1
   }
 
-  [[ -d "${MLOPS_EXAMPLES_DIR}/dags" ]] || {
-    echo "ERROR: shared DAG directory is missing: ${MLOPS_EXAMPLES_DIR}/dags" >&2
-    return 1
-  }
-
-  while IFS= read -r manifest_file; do
+  while IFS= read -r -d '' manifest_file; do
     repo_dir="$(dirname "${manifest_file}")"
     unset PROJECT_NAME DAGS_DIR ENV_FILE
     # shellcheck source=/dev/null
     source "${manifest_file}"
 
     project_name="${PROJECT_NAME:-$(basename "${repo_dir}")}"
+    sanitized_name="$(sanitize_name "${project_name}")"
     dags_dir="${repo_dir}/${DAGS_DIR:-dags}"
     env_file=""
     if [[ -n "${ENV_FILE:-}" ]]; then
       env_file="${repo_dir}/${ENV_FILE}"
+    fi
+
+    if [[ -z "${sanitized_name}" ]]; then
+      echo "ERROR: project name '${project_name}' from ${manifest_file} is invalid" >&2
+      had_error=1
+    elif [[ -n "${seen_names[${sanitized_name}]:-}" ]]; then
+      echo "ERROR: duplicate project name '${project_name}' in ${manifest_file} conflicts with ${seen_names[${sanitized_name}]}" >&2
+      had_error=1
+    else
+      seen_names["${sanitized_name}"]="${manifest_file}"
     fi
 
     if [[ ! -d "${dags_dir}" ]]; then
@@ -107,7 +128,7 @@ validate_projects() {
       echo "ERROR: env file for ${project_name} is missing: ${env_file}" >&2
       had_error=1
     fi
-  done < <(find "${AIRFLOW_PROJECTS_DIR}" -mindepth 2 -maxdepth 2 -type f -name "${MANIFEST_NAME}" | sort)
+  done < <(find_project_manifests)
 
   [[ "${had_error}" -eq 0 ]]
 }

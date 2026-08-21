@@ -10,7 +10,6 @@ x-airflow-common-env: &airflow-common-env
   AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-change_me_airflow_web_secret_key}
   AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "True"
   MLOPS_NETWORK: ${MLOPS_NETWORK}
-  MLOPS_EXAMPLES_HOST_DIR: ${MLOPS_EXAMPLES_DIR:?Set MLOPS_EXAMPLES_DIR to your mlops-examples checkout}
   PUBLIC_FQDN: ${PUBLIC_FQDN}
   MLFLOW_BASE_PATH: ${MLFLOW_BASE_PATH}
   MLFLOW_TRACKING_URI: http://mlflow:${MLFLOW_PORT}
@@ -25,12 +24,12 @@ x-airflow-common-env: &airflow-common-env
   MLFLOW_AUTH_ADMIN_PASSWORD: ${MLFLOW_AUTH_ADMIN_PASSWORD:?Set MLFLOW_AUTH_ADMIN_PASSWORD in env/secrets.env}
   MLFLOW_TRACKING_USERNAME: ${MLFLOW_TRACKING_USERNAME:-}
   MLFLOW_TRACKING_PASSWORD: ${MLFLOW_TRACKING_PASSWORD:-}
+  AIRFLOW_PLATFORM_DAGS_DIR: /opt/airflow/platform-dags
   AIRFLOW_PROJECTS_ROOT: /opt/airflow/projects-root
   AIRFLOW_PROJECTS_HOST_ROOT: ${AIRFLOW_PROJECTS_DIR:?Set AIRFLOW_PROJECTS_DIR in env/config.env or your shell}
-  AIRFLOW_SHARED_DAGS_DIR: /opt/mlops-examples/dags
 
 x-airflow-common-volumes: &airflow-common-volumes
-  - ${MLOPS_EXAMPLES_DIR:?Set MLOPS_EXAMPLES_DIR to your mlops-examples checkout}:/opt/mlops-examples
+  - ./dags:/opt/airflow/platform-dags:ro
   - ${AIRFLOW_PROJECTS_DIR:?Set AIRFLOW_PROJECTS_DIR in env/config.env or your shell}:/opt/airflow/projects-root:ro
   - /var/run/docker.sock:/var/run/docker.sock
   - airflow_dags:/opt/airflow/dags
@@ -73,7 +72,7 @@ services:
       - ./scripts/init-airflow.sh:/scripts/init-airflow.sh:ro
       - ./scripts/prepare-airflow-projects.sh:/scripts/prepare-airflow-projects.sh:ro
       - ./scripts/run-airflow-service.sh:/scripts/run-airflow-service.sh:ro
-      - ${MLOPS_EXAMPLES_DIR:?Set MLOPS_EXAMPLES_DIR to your mlops-examples checkout}:/opt/mlops-examples
+      - ./dags:/opt/airflow/platform-dags:ro
       - ${AIRFLOW_PROJECTS_DIR:?Set AIRFLOW_PROJECTS_DIR in env/config.env or your shell}:/opt/airflow/projects-root:ro
       - airflow_dags:/opt/airflow/dags
       - airflow_logs:/opt/airflow/logs
@@ -106,7 +105,7 @@ services:
     volumes:
       - ./scripts/prepare-airflow-projects.sh:/scripts/prepare-airflow-projects.sh:ro
       - ./scripts/run-airflow-service.sh:/scripts/run-airflow-service.sh:ro
-      - ${MLOPS_EXAMPLES_DIR:?Set MLOPS_EXAMPLES_DIR to your mlops-examples checkout}:/opt/mlops-examples
+      - ./dags:/opt/airflow/platform-dags:ro
       - ${AIRFLOW_PROJECTS_DIR:?Set AIRFLOW_PROJECTS_DIR in env/config.env or your shell}:/opt/airflow/projects-root:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - airflow_dags:/opt/airflow/dags
@@ -130,7 +129,7 @@ services:
     volumes:
       - ./scripts/prepare-airflow-projects.sh:/scripts/prepare-airflow-projects.sh:ro
       - ./scripts/run-airflow-service.sh:/scripts/run-airflow-service.sh:ro
-      - ${MLOPS_EXAMPLES_DIR:?Set MLOPS_EXAMPLES_DIR to your mlops-examples checkout}:/opt/mlops-examples
+      - ./dags:/opt/airflow/platform-dags:ro
       - ${AIRFLOW_PROJECTS_DIR:?Set AIRFLOW_PROJECTS_DIR in env/config.env or your shell}:/opt/airflow/projects-root:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - airflow_dags:/opt/airflow/dags
